@@ -1,9 +1,10 @@
 # LinebotConversationExample
 ===
 
-  ½Ğ°Ñ¦Ò: http://studyhost.blogspot.tw/2017/08/linebot11chat-bot.html
+  æœ¬Line botåƒè€ƒè‡ªhttp://studyhost.blogspot.tw/2017/08/linebot11chat-bot.html
+  ä¾ç…§å°ˆé¡Œéœ€æ±‚åšæ›´æ­£!
     <br/>
 
-    ­Y­n´ú¸Õ¦¹½d¨Ò½Ğ±N§AªºLine bot WebHook³]¬°: http://§Aªºdomain/api/cictest
+    è‹¥è¦æ¸¬è©¦æ­¤ç¯„ä¾‹è«‹å°‡ä½ çš„Line bot WebHookè¨­ç‚º: http://ä½ çš„domain/api/cictest
   
-    "½Ğ´«¦¨§A¦Û¤vªºChannel Access Token" ¨º¤@¬q°È¥²­n°O±o´«...
+    "è«‹æ›æˆä½ è‡ªå·±çš„Channel Access Token" é‚£ä¸€æ®µå‹™å¿…è¦è¨˜å¾—æ›...
