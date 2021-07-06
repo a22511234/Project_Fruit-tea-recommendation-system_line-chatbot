@@ -23,19 +23,9 @@
 
 ### 流程圖 Flowchart
 
-```flow
-st=>start: 使用者假入Line官方帳號
-op=>operation: 登陸操作
-op2=>operation: 設定個人資料
-op3=>operation: 傳入個人照片
-cond=>condition: 是否第一次加入 Yes or No?
-e=>end: 進入WebApp
+[![](https://i.imgur.com/lgBUhf2.png)](https://i.imgur.com/lgBUhf2.png)
 
-st->op->cond
-cond(yes)->op2->op3->e
-cond(no)->op3->e
-```
-[========]
+
 ## 參考資源
 LineBotSDK：https://www.nuget.org/packages/LineBotSDK
 <br/>線上課程：https://www.udemy.com/line-bot/
