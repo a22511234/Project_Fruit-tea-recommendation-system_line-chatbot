@@ -1,17 +1,26 @@
-﻿using isRock.LineBot;
+﻿using Imgur.API.Authentication;
+using Imgur.API.Endpoints;
+using Imgur.API.Models;
+using isRock.LineBot;
 using isRock.LineBot.Conversation;
+using Microsoft.ProjectOxford.Face;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text;
 using System.Web.Http;
+
 
 namespace LinebotConversationExample.Controllers
 {
     public class CICTestController : ApiController
     {
-        string[] sArray;
+
         public bool IsDate(string strDate)
         {
             try
@@ -24,7 +33,7 @@ namespace LinebotConversationExample.Controllers
                 return false;
             }
         }
-        public void sendconfirmsg (string UserID,string ChannelAccessToken)
+        public void sendconfirmsg(string UserID, string ChannelAccessToken)
         {
             var ConfirmMsg = new isRock.LineBot.ConfirmTemplate();
             ConfirmMsg.altText = "請在手機上觀看";
@@ -36,47 +45,167 @@ namespace LinebotConversationExample.Controllers
             isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
             bot.PushMessage(UserID, ConfirmMsg);
         }
+        static void flex(string userid)
+        { //提供三個水果選項的，之後要補水果名稱與相對應知圖片網址
+            var flex = @"
+[
+{
+  ""type"": ""template"",
+  ""altText"": ""this is an image carousel template"",
+  ""template"": {
+                ""type"": ""image_carousel"",
+    ""columns"": [
+      {
+                    ""imageUrl"": ""https://i.imgur.com/6C96oJv.png"",
+        ""action"": {
+                        ""type"": ""uri"",
+          ""label"": ""蘋果"",
+          ""uri"": ""https://www.youtube.com/watch?v=ADCArgJeQZQ""
+        }
+                },
+      {
+                    ""imageUrl"": ""https://i.imgur.com/T9Llt8B.png"",
+        ""action"": {
+                        ""type"": ""uri"",
+          ""label"": ""鳳梨"",
+          ""uri"": ""https://www.youtube.com/watch?v=YlU9O-TYkQU""
+        }
+                },
+      {
+                    ""imageUrl"": ""https://i.imgur.com/pJmvVKp.png"",
+        ""action"": {
+                        ""type"": ""uri"",
+          ""label"": ""西瓜"",
+          ""uri"": ""https://www.youtube.com/watch?v=Vz55uDiFmEY""
+        }
+                }
+    ]
+  }
+        
+}
+    
+]
+";
+            isRock.LineBot.Bot bot = new isRock.LineBot.Bot("S3o7moA62IOh6lIIdD5ECoK4zCKGa9D6C9vR0wzkmX2KaQDtj6Zcp7Q+ijNHS1WV2S5fx2a7a+oFKhIehTvm2dDqMD2qLYRQgbN4/6yq+inaRzj7eU0glrmQy0G2PErxMS5Erm9wQifEaQ/xD55QoQdB04t89/1O/w1cDnyilFU=");
+            bot.PushMessageWithJSON(userid, flex);
+        }
+        private string UploadImage2Imgur(byte[] bytes)
+        {
+            var Imgur_CLIENT_ID = "50140947a620cb3";
+            var Imgur_CLIENT_SECRET = "579e3c98ced5660c5628fb426436ae474b3a928d";
+
+            //建立 ImgurClient準備上傳圖片
+            var client = new ApiClient(Imgur_CLIENT_ID, Imgur_CLIENT_SECRET);
+            var httpClient = new HttpClient();
+
+            var endpoint = new ImageEndpoint(client, httpClient);
+            IImage image;
+            //上傳Imgur
+            image = endpoint.UploadImageAsync(new MemoryStream(bytes)).GetAwaiter().GetResult();
+
+            return image.Link;
+        }
+        static string Call_azure_face_api(string URL)
+        {
+            string host = "https://react-native-face-test.cognitiveservices.azure.com/face/v1.0/detect?returnFaceAttributes=age,emotion";
+            string subscriptionKey = "541a8e95880049fabb04e5944019974d";
+            var body = new { url = URL };
+            var requestBody = JsonConvert.SerializeObject(body);
+
+            using (var client = new HttpClient())
+            using (var request = new HttpRequestMessage())
+            {
+                client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", subscriptionKey);
+                request.Method = HttpMethod.Post;
+                request.RequestUri = new Uri(host);
+                request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
+
+                var response = client.SendAsync(request).Result;
+                var jsonResponse = response.Content.ReadAsStringAsync().Result;
+                return jsonResponse;
+            }
+        }
+        static string[] formateFaceApi_response(string FaceData)
+        {
+            string[] FaceDataArray = FaceData.Split(new char[7] { '[', '{', '"', ':', ',', '}', ']' });
+            FaceDataArray = FaceDataArray.Where(s => !string.IsNullOrEmpty(s)).ToArray();
+            foreach (var item in FaceDataArray)
+                Console.WriteLine(item);//將此資料寫入資料庫
+            return FaceDataArray;
+            /* 用來處理當出現兩個人臉時
+            var searchData = Array.FindAll(sArray, (v) => { return v.StartsWith("faceId"); });
+           if (searchData.Length == 1)
+           {
+        Console.WriteLine("只有一個face ID");
+           }
+           */
+        }
+        private void ProcessImageAsync(isRock.LineBot.Event LineEvent, string token)
+        {
+            string userID = LineEvent.source.userId;
+            //取得照片從LineEvent取得用戶上傳的圖檔bytes
+            var byteArray = isRock.LineBot.Utility.GetUserUploadedContent(LineEvent.message.id, token);
+            //取得圖片檔案FileStream, 分別作為繪圖與分析用
+            Stream MemStream1 = new MemoryStream(byteArray);
+            System.Drawing.Bitmap bmp = new System.Drawing.Bitmap(MemStream1);
+            string ImgurURL = "";
+            using (MemoryStream m = new MemoryStream())
+            {
+                bmp.Save(m, System.Drawing.Imaging.ImageFormat.Png);
+                ImgurURL = UploadImage2Imgur(m.ToArray());
+            }
+           
+            string dect = Call_azure_face_api(ImgurURL);
+            string[] FaceDataArray = formateFaceApi_response(dect);//結果是要放入資料庫的
+            string face_data = "";
+            foreach (var item in FaceDataArray)
+                face_data+=item+" ";
+            isRock.LineBot.Bot bot = new isRock.LineBot.Bot("S3o7moA62IOh6lIIdD5ECoK4zCKGa9D6C9vR0wzkmX2KaQDtj6Zcp7Q+ijNHS1WV2S5fx2a7a+oFKhIehTvm2dDqMD2qLYRQgbN4/6yq+inaRzj7eU0glrmQy0G2PErxMS5Erm9wQifEaQ/xD55QoQdB04t89/1O/w1cDnyilFU=");
+            bot.PushMessage(userID, face_data);
+
+        }
         [HttpPost]
         public IHttpActionResult POST()
         {
             const string ChannelAccessToken = "S3o7moA62IOh6lIIdD5ECoK4zCKGa9D6C9vR0wzkmX2KaQDtj6Zcp7Q+ijNHS1WV2S5fx2a7a+oFKhIehTvm2dDqMD2qLYRQgbN4/6yq+inaRzj7eU0glrmQy0G2PErxMS5Erm9wQifEaQ/xD55QoQdB04t89/1O/w1cDnyilFU=";
             var responseMsg = "";
             bool confirm = false;
-            string[] profile = new string[6];
-
+            
             try
             {
                 //定義資訊蒐集者
                 isRock.LineBot.Conversation.InformationCollector<LeaveRequestV2> CIC =
                     new isRock.LineBot.Conversation.InformationCollector<LeaveRequestV2>(ChannelAccessToken);
-                CIC.OnMessageTypeCheck += (s, e) => {
+                // 底下是個人資料輸入確認資訊
+                CIC.OnMessageTypeCheck += (s, e) =>
+                {
                     switch (e.CurrentPropertyName)
                     {
                         case "名子":
-                            if (e.ReceievedMessage.Length<1)
+                            if (e.ReceievedMessage.Length < 1)
                             {
                                 e.isMismatch = true;
                                 e.ResponseMessage = "請輸入姓名，不可少於一個字元";
                             }
-                            profile[0] = e.ReceievedMessage;
+
                             break;
                         case "年齡":
                             if (e.ReceievedMessage.All(char.IsDigit))
                             {
-                                 Console.WriteLine(e.ReceievedMessage);
-                                 profile[1] = e.ReceievedMessage;
+                                Console.WriteLine(e.ReceievedMessage);
+
                             }
                             else
                             {
-                                 e.isMismatch = true;
-                                 e.ResponseMessage = "年齡介於0~100，請不要亂輸入";
+                                e.isMismatch = true;
+                                e.ResponseMessage = "年齡介於0~100，請不要亂輸入";
                             }
                             break;
                         case "生日日期":
                             if (IsDate(e.ReceievedMessage))
                             {
                                 Console.WriteLine(e.ReceievedMessage);
-                                profile[2] = e.ReceievedMessage;
+
                             }
                             else
                             {
@@ -88,7 +217,6 @@ namespace LinebotConversationExample.Controllers
                             if (e.ReceievedMessage.All(char.IsDigit))
                             {
                                 Console.WriteLine(e.ReceievedMessage);
-                                profile[3] = e.ReceievedMessage;
                             }
                             else
                             {
@@ -100,7 +228,7 @@ namespace LinebotConversationExample.Controllers
                             if (e.ReceievedMessage.All(char.IsDigit))
                             {
                                 Console.WriteLine(e.ReceievedMessage);
-                                profile[4] = e.ReceievedMessage;
+
                             }
                             else
                             {
@@ -114,14 +242,13 @@ namespace LinebotConversationExample.Controllers
                                 e.isMismatch = true;
                                 e.ResponseMessage = "你只能輸入低度活動, 中度活動, 高度活動其中之一，不要自己亂填寫哦!";
                             }
-                            profile[5] = e.ReceievedMessage;
+
                             break;
                         default:
                             break;
                     }
 
                 };
-
                 //取得 http Post RawData(should be JSO
                 string postData = Request.Content.ReadAsStringAsync().Result;
                 //剖析JSON
@@ -138,6 +265,27 @@ namespace LinebotConversationExample.Controllers
                 }
                 if (ReceivedMessage.events[0].type == "message")
                 {
+                    if (ReceivedMessage.events[0].message.type == "image")
+                    {
+                        string userID = ReceivedMessage.events[0].source.userId;
+                        string waiting = "處理照片中...";
+                        string complete = "照片分析完畢.\n我們推薦你以下三樣水果，點選其中一個進去，觀看相對應的食譜吧!";
+                        isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
+                        isRock.LineBot.TextMessage TextMsg = new isRock.LineBot.TextMessage(waiting);
+                        isRock.LineBot.TextMessage TextMsg2 = new isRock.LineBot.TextMessage(complete);
+                        //建立集合
+                        var Messages = new List<isRock.LineBot.MessageBase>();
+                        Messages.Add(TextMsg);
+                        Messages.Add(TextMsg2);
+                        bot.ReplyMessage(ReceivedMessage.events[0].replyToken, Messages);
+                        flex(userID);
+                        ProcessImageAsync(ReceivedMessage.events[0], ChannelAccessToken);
+
+                    }
+                    if (ReceivedMessage.events[0].message.type == "location")
+                    {
+
+                    }
                     if (ReceivedMessage.events[0].message.text == "#不設定")
                     {
                         isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
@@ -147,7 +295,7 @@ namespace LinebotConversationExample.Controllers
                         m.quickReply.items.Add(new isRock.LineBot.QuickReplyMessageAction($"不要", "#不設定"));
                         bot.ReplyMessage(ReceivedMessage.events[0].replyToken, m);
                     }
-                    else if(ReceivedMessage.events[0].message.text == "#沒有問題")
+                    else if (ReceivedMessage.events[0].message.text == "#沒有問題")
                     {
                         isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
 
@@ -163,13 +311,12 @@ namespace LinebotConversationExample.Controllers
                             "Show Cameraroll", new Uri("https://www.pinclipart.com/picdir/big/164-1647836_album-collection-list-music-playlist-songs-icon-gallery.png")));
                         bot.ReplyMessage(ReceivedMessage.events[0].replyToken, m);
                     }
-                    else if(ReceivedMessage.events[0].message.text == "#個人資料")
+                    else if (ReceivedMessage.events[0].message.text == "#個人資料")
                     {
                         isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
                         string res = $"您的個人資料如下 \n 姓名:  '黃子豪' \n 年齡: '21' \n生日:  '2000-07-20' \n身高: 177.0 \n體重: 88.0 \n活動程度: '中度活動' ";
                         //建立一個TextMessage物件
-                        isRock.LineBot.TextMessage m =
-                         new isRock.LineBot.TextMessage(res);
+                        isRock.LineBot.TextMessage m = new isRock.LineBot.TextMessage(res);
                         m.quickReply.items.Add(new isRock.LineBot.QuickReplyMessageAction("重新設定個人資料", "#重新個人資料"));
                         bot.ReplyMessage(ReceivedMessage.events[0].replyToken, m);
                     }
@@ -212,9 +359,9 @@ namespace LinebotConversationExample.Controllers
                                 responseMsg += result.ResponseMessageCandidate;
                                 responseMsg += $"以下是您的資料\n";
                                 responseMsg += Newtonsoft.Json.JsonConvert.SerializeObject(result.ConversationState.ConversationEntity);
-                                sArray = Newtonsoft.Json.JsonConvert.SerializeObject(result.ConversationState.ConversationEntity).Split(new char[4] { '{', '}', ',' ,':'});//分別以!還有~y作為分隔符號
+                                string temp = "等資料庫建立";
                                 confirm = true;
-                                string res = $"您的個人資料如下 \n姓名: {sArray[2]} \n年齡: {sArray[4]} \n生日: {sArray[6]} \n身高: {sArray[8]} \n體重: {sArray[10]} \n活動程度: {sArray[12]} ";
+                                string res = $"您的個人資料如下 \n姓名: {temp} \n年齡: {temp} \n生日: {temp} \n身高: {temp} \n體重: {temp} \n活動程度: {temp} ";
                                 isRock.LineBot.Utility.ReplyMessage(ReceivedMessage.events[0].replyToken, res, ChannelAccessToken);
                                 sendconfirmsg(ReceivedMessage.events[0].source.userId, ChannelAccessToken);
                                 break;
@@ -254,21 +401,21 @@ namespace LinebotConversationExample.Controllers
                     }
 
                 }
-                    //回覆API OK
-                    return Ok();
+                //回覆API OK
+                return Ok();
             }
             catch (Exception ex)
             {
                 //如果你要偵錯的話
                 isRock.LineBot.Utility.PushMessage("Ua3d3e1675bca2f5e468a6c80bf49f332", ex.Message, ChannelAccessToken);
                 return Ok();
-                
+
             }
         }
     }
 
     /// <summary>
-    /// 用來表達一個對話
+    /// 用來表達一個對話 問題設計
     /// </summary>
     public class LeaveRequestV2 : ConversationEntity
     {
@@ -281,7 +428,7 @@ namespace LinebotConversationExample.Controllers
         [Order(2)]
         public string 年齡 { get; set; }
 
-       
+
         [Question("請問您的生日日期是? 例:2000-07-20")]
         [Order(3)]
         public string 生日日期 { get; set; }
