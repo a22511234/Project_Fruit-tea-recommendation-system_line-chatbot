@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
 using System.Net.Http;
 using System.Text;
 using System.Web.Http;
@@ -16,7 +17,7 @@ namespace LineBotFaceRecognition.Controllers
     public class LineBotWebHookController : isRock.LineBot.LineWebHookControllerBase
     {
 
-        [Route("api/LineBot")]
+        [Route("api/LineFaceRec")]
         [HttpPost]
         public IHttpActionResult POST()
         {
@@ -127,24 +128,21 @@ namespace LineBotFaceRecognition.Controllers
                         //辨識與繪製圖片
                         string userID = ReceivedMessage.events[0].source.userId;
                         string waiting = "處理照片中...";
-                        string a = " 開心 ";
-                        string complete = $"照片分析完畢.\n依照分析結果您的心情為{a}，因此我們推薦你以下三樣水果，點選其中一個進去，觀看相對應的食譜吧!";
-
-                        isRock.LineBot.TextMessage TextMsg = new isRock.LineBot.TextMessage(waiting);
-                        isRock.LineBot.TextMessage TextMsg2 = new isRock.LineBot.TextMessage(complete);
-                        var Messages = new List<isRock.LineBot.MessageBase>();
-                        Messages.Add(TextMsg);
-                        Messages.Add(TextMsg2);
-                        this.ReplyMessage(ReceivedMessage.events[0].replyToken, Messages);
-                        flex(userID);
-                        var Messagess = ProcessImageAsync(LineEvent, token);
-                        this.PushMessage(userID, Messagess);
+                        this.ReplyMessage(ReceivedMessage.events[0].replyToken, waiting);
+                        string Messagess = ProcessImageAsync(LineEvent, token);
+                        string a = Messagess;
+                        string complete = $"照片分析完畢.\n依照分析結果您的心情為 {a}，因此我們推薦你以下三樣水果，點選其中一個進去，觀看相對應的食譜吧!";
+                        this.PushMessage(userID, complete);
+                        flex(userID, ChannelAccessToken);
                     }
                     else if (LineEvent.message.type == "location")
                     {
-                        this.ReplyMessage(ReceivedMessage.events[0].replyToken, "功能尚未解鎖");
-                    }
+                        string userid = LineEvent.source.userId;
+                        string lng = "" + LineEvent.message.longitude;
+                        string lat = "" + LineEvent.message.latitude;
+                        google_map_api(userid, lat, lng, token);
 
+                    }
                     else if (LineEvent.message.type == "text")
                     {
                         if (LineEvent.message.text == "#不設定")
@@ -276,9 +274,8 @@ namespace LineBotFaceRecognition.Controllers
         /// <param name="LineEvent"></param>
         /// <param name="token"></param>
         /// <returns></returns>
-        private List<isRock.LineBot.MessageBase> ProcessImageAsync(isRock.LineBot.Event LineEvent, string token)
+        private string ProcessImageAsync(isRock.LineBot.Event LineEvent, string token)
         {
-            string Msg = "";
             //取得照片從LineEvent取得用戶上傳的圖檔bytes
             var byteArray = isRock.LineBot.Utility.GetUserUploadedContent(LineEvent.message.id, token);
             //取得圖片檔案FileStream, 分別作為繪圖與分析用
@@ -290,21 +287,11 @@ namespace LineBotFaceRecognition.Controllers
                 bmp.Save(m, System.Drawing.Imaging.ImageFormat.Png);
                 ImgurURL = UploadImage2Imgur(m.ToArray());
             }
-            Msg = $"{ImgurURL}";
             string dect = TryFunction(ImgurURL);
             string FaceData = formatFaceApi(dect);//結果是要放入資料庫的
-            Msg = Msg + "\n" + FaceData;
-            //建立文字訊息
-            isRock.LineBot.TextMessage TextMsg = new isRock.LineBot.TextMessage(Msg);
-            //建立圖形訊息(用上傳後的網址)
-            isRock.LineBot.ImageMessage imageMsg = new isRock.LineBot.ImageMessage(new Uri(ImgurURL), new Uri(ImgurURL));
-            //建立集合
-            var Messages = new List<isRock.LineBot.MessageBase>();
-            Messages.Add(TextMsg);
-            Messages.Add(imageMsg);
 
-            //一次把集合中的多則訊息回覆給用戶
-            return Messages;
+
+            return FaceData;
         }
 
         //Upload Image to Imgur
@@ -351,7 +338,17 @@ namespace LineBotFaceRecognition.Controllers
             FaceDataArray = FaceDataArray.Where(s => !string.IsNullOrEmpty(s)).ToArray();
             foreach (var item in FaceDataArray)
                 result += item + "\n";
-            return result;
+            string[] emotion = { "憤怒", "藐視", "厭惡", "恐懼", "開心", "普通", "悲傷", "驚訝" };
+            double[] emotion_value = new double[emotion.Length];
+            int index = 0;
+            for (int i = 16; i < 31; i += 2)
+            {
+                emotion_value[index] = Convert.ToDouble(FaceDataArray[i]);
+                index++;
+            }
+            double maxValue = emotion_value.Max();
+            int maxIndex = emotion_value.ToList().IndexOf(maxValue);
+            return emotion[maxIndex];
             /* 用來處理當出現兩個人臉時
             var searchData = Array.FindAll(sArray, (v) => { return v.StartsWith("faceId"); });
            if (searchData.Length == 1)
@@ -360,7 +357,7 @@ namespace LineBotFaceRecognition.Controllers
            }
            */
         }
-        static void flex(string userid)
+        static void flex(string userid, string token)
         { //提供三個水果選項的，之後要補水果名稱與相對應知圖片網址
             var flex = @"
 [
@@ -401,7 +398,7 @@ namespace LineBotFaceRecognition.Controllers
     
 ]
 ";
-            isRock.LineBot.Bot bot = new isRock.LineBot.Bot("S3o7moA62IOh6lIIdD5ECoK4zCKGa9D6C9vR0wzkmX2KaQDtj6Zcp7Q+ijNHS1WV2S5fx2a7a+oFKhIehTvm2dDqMD2qLYRQgbN4/6yq+inaRzj7eU0glrmQy0G2PErxMS5Erm9wQifEaQ/xD55QoQdB04t89/1O/w1cDnyilFU=");
+            isRock.LineBot.Bot bot = new isRock.LineBot.Bot(token);
             bot.PushMessageWithJSON(userid, flex);
         }
         public bool IsDate(string strDate)
@@ -428,9 +425,120 @@ namespace LineBotFaceRecognition.Controllers
             isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
             bot.PushMessage(UserID, ConfirmMsg);
         }
+        static void google_map_api(string userid, string lat, string lng, string token)
+        {
+            var ChannelAccessToken = token;
+            isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
+            string location0_name, location0_lat, location0_lng, location0_placeID, location1_name, location1_lat, location1_lng, location1_placeID, location2_name, location2_lat, location2_lng, location2_placeID;
+            string[] PlaceID = new string[3];
+            string[] addr = new string[3];
+            string[] tel = { "無", "無", "無" };
+            string sURL = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius=1000&type=supermarket&keyword=%E9%A4%90%E5%BB%B3&key=AIzaSyBGAICU-ZH4QYDFSZW4jzgo9DWARe_pPrM";
+            using (var client = new WebClient())
+            using (var stream = client.OpenRead(sURL))
+            using (var reader = new StreamReader(stream))
+            using (var json = new JsonTextReader(reader))
+            {
+                var jObject = Newtonsoft.Json.Linq.JObject.Load(json);
+                location0_name = (string)jObject["results"][0]["name"];
+                location0_lat = (string)jObject["results"][0]["geometry"]["location"]["lat"];
+                location0_lng = (string)jObject["results"][0]["geometry"]["location"]["lng"];
+                location0_placeID = (string)jObject["results"][0]["place_id"];
+                PlaceID[0] = location0_placeID;
+                location1_name = (string)jObject["results"][1]["name"];
+                location1_lat = (string)jObject["results"][1]["geometry"]["location"]["lat"];
+                location1_lng = (string)jObject["results"][1]["geometry"]["location"]["lng"];
+                location1_placeID = (string)jObject["results"][1]["place_id"];
+                PlaceID[1] = location1_placeID;
+                location2_name = (string)jObject["results"][2]["name"];
+                location2_lat = (string)jObject["results"][2]["geometry"]["location"]["lat"];
+                location2_lng = (string)jObject["results"][2]["geometry"]["location"]["lng"];
+                location2_placeID = (string)jObject["results"][2]["place_id"];
+                PlaceID[2] = location2_placeID;
+            }
+            int index = 0;
+            while (index < 3)
+            {
+                string sURL2 = $"https://maps.googleapis.com/maps/api/place/details/json?place_id={PlaceID[index]}&language=zh-TW&key=AIzaSyBGAICU-ZH4QYDFSZW4jzgo9DWARe_pPrM";
+                using (var client = new WebClient())
+                using (var stream = client.OpenRead(sURL2))
+                using (var reader = new StreamReader(stream))
+                using (var json = new JsonTextReader(reader))
+                {
+                    var jObject = Newtonsoft.Json.Linq.JObject.Load(json);
+                    addr[index] = "店家地址 : " + (string)jObject["result"]["formatted_address"];
+                    tel[index] = "店家電話 : " + (string)jObject["result"]["formatted_phone_number"];
+                }
+                index++;
+            }
+            var flex = @"
+                        [{""type"": ""template"",
+                          ""altText"": ""this is a carousel template"",
+                          ""template"": {
+                                        ""type"": ""carousel"",
+                            ""columns"": [
+                              {
+                                            ""title"": ""標題1"",
+                                ""text"": ""地址資訊1 \r\n 電話資訊1"",
+                                ""actions"": [
+                                  {
+                                                ""type"": ""uri"",
+                                    ""label"": ""跳轉Google Map"",
+                                    ""uri"": ""uri1""
+                                  }
+                                ],
+                                ""imageBackgroundColor"": ""#F7F7F7""
+                              },
+                              {
+                                            ""title"": ""標題2"",
+                                ""text"": ""地址資訊2\r\n電話資訊2"",
+                                ""actions"": [
+                                  {
+                                                ""type"": ""uri"",
+                                    ""label"": ""跳轉Google Map"",
+                                    ""uri"": ""uri2""
+                                  }
+                                ],
+                                ""imageBackgroundColor"": ""#F7F7F7""
+                              },
+                              {
+                                            ""title"": ""標題3"",
+                                ""text"": ""地址資訊3 \r\n 電話資訊3"",
+                                ""actions"": [
+                                  {
+                                                ""type"": ""uri"",
+                                    ""label"": ""跳轉Google Map"",
+                                    ""uri"": ""uri3""
+                                  }
+                                ],
+                                ""imageBackgroundColor"": ""#FFFFFF""
+                              }
+                            ]
+                          }
+                                }
+                        ] ";
 
+            string uri1 = $"https://www.google.com/maps/search/?api=1&query={location0_lat},{location0_lng}&query_place_id={location0_placeID}";
+            string uri2 = $"https://www.google.com/maps/search/?api=1&query={location1_lat},{location1_lng}&query_place_id={location1_placeID}";
+            string uri3 = $"https://www.google.com/maps/search/?api=1&query={location2_lat},{location2_lng}&query_place_id={location2_placeID}";
+            flex = flex.Replace("uri1", uri1);
+            flex = flex.Replace("uri2", uri2);
+            flex = flex.Replace("uri3", uri3);
+            flex = flex.Replace("標題1", location0_name);
+            flex = flex.Replace("標題2", location1_name);
+            flex = flex.Replace("標題3", location2_name);
+            flex = flex.Replace("地址資訊1", addr[0]);
+            flex = flex.Replace("地址資訊2", addr[1]);
+            flex = flex.Replace("地址資訊3", addr[2]);
+            flex = flex.Replace("電話資訊1", tel[0]);
+            flex = flex.Replace("電話資訊2", tel[1]);
+            flex = flex.Replace("電話資訊3", tel[2]);
+            bot.PushMessage(userid, "以下是離你最近的三個超市");
+            bot.PushMessageWithJSON(userid, flex);
 
+        }
     }
+
     public class LeaveRequestV2 : ConversationEntity
     {
 
