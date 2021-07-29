@@ -11,11 +11,15 @@ using Imgur.API.Endpoints;
 using Imgur.API.Models;
 using isRock.LineBot.Conversation;
 using Newtonsoft.Json;
+using FireSharp.Config;
+using FireSharp.Response;
+using FireSharp.Interfaces;
 
 namespace LineBotFaceRecognition.Controllers
 {
     public class LineBotWebHookController : isRock.LineBot.LineWebHookControllerBase
     {
+
 
         [Route("api/LineFaceRec")]
         [HttpPost]
@@ -27,8 +31,15 @@ namespace LineBotFaceRecognition.Controllers
             var responseMsg = "";
             bool confirm = false;
             isRock.LineBot.Event LineEvent = null;
+            IFirebaseConfig fcon = new FirebaseConfig()
+            {
+                AuthSecret = "bW4Tp1NHyMLMkWo1loJcqf9gVzKgzmYw6LHF1Eu3",
+                BasePath = "https://dailyjuicy-40e64-default-rtdb.firebaseio.com/"
+            };
             try
             {
+                //設定資料庫
+                IFirebaseClient client = new FireSharp.FirebaseClient(fcon);
                 //設定ChannelAccessToken(或抓取Web.Config)
                 this.ChannelAccessToken = token;
                 //取得Line Event(本例是範例，因此只取第一個)
@@ -46,13 +57,13 @@ namespace LineBotFaceRecognition.Controllers
                                 e.isMismatch = true;
                                 e.ResponseMessage = "請輸入姓名，不可少於一個字元";
                             }
-
+                            userdatabaseupdate(e.CurrentPropertyName, e.ReceievedMessage);
                             break;
                         case "年齡":
                             if (e.ReceievedMessage.All(char.IsDigit))
                             {
                                 Console.WriteLine(e.ReceievedMessage);
-
+                                userdatabaseupdate(e.CurrentPropertyName, e.ReceievedMessage);
                             }
                             else
                             {
@@ -64,7 +75,7 @@ namespace LineBotFaceRecognition.Controllers
                             if (IsDate(e.ReceievedMessage))
                             {
                                 Console.WriteLine(e.ReceievedMessage);
-
+                                userdatabaseupdate(e.CurrentPropertyName, e.ReceievedMessage);
                             }
                             else
                             {
@@ -76,6 +87,7 @@ namespace LineBotFaceRecognition.Controllers
                             if (e.ReceievedMessage.All(char.IsDigit))
                             {
                                 Console.WriteLine(e.ReceievedMessage);
+                                userdatabaseupdate(e.CurrentPropertyName, e.ReceievedMessage);
                             }
                             else
                             {
@@ -87,7 +99,7 @@ namespace LineBotFaceRecognition.Controllers
                             if (e.ReceievedMessage.All(char.IsDigit))
                             {
                                 Console.WriteLine(e.ReceievedMessage);
-
+                                userdatabaseupdate(e.CurrentPropertyName, e.ReceievedMessage);
                             }
                             else
                             {
@@ -101,7 +113,7 @@ namespace LineBotFaceRecognition.Controllers
                                 e.isMismatch = true;
                                 e.ResponseMessage = "你只能輸入低度活動, 中度活動, 高度活動其中之一，不要自己亂填寫哦!";
                             }
-
+                            userdatabaseupdate(e.CurrentPropertyName, e.ReceievedMessage);
                             break;
                         default:
                             break;
@@ -119,6 +131,17 @@ namespace LineBotFaceRecognition.Controllers
                     m.quickReply.items.Add(new isRock.LineBot.QuickReplyMessageAction($"好的", "#設定個人資料"));
                     m.quickReply.items.Add(new isRock.LineBot.QuickReplyMessageAction($"不要", "#不設定"));
                     bot.ReplyMessage(ReceivedMessage.events[0].replyToken, m);
+                    user user = new user()
+                    {
+                        UserID = ReceivedMessage.events[0].source.userId,
+                        Name = "",
+                        Age = "",
+                        Birthday = "",
+                        Height = "",
+                        Weight = "",
+                        Active = ""
+                    };
+                    var setter = client.Set("UserList/" + ReceivedMessage.events[0].source.userId, user);
                 }
                 //回覆訊息
                 if (LineEvent.type == "message")
@@ -172,12 +195,24 @@ namespace LineBotFaceRecognition.Controllers
                         }
                         else if (ReceivedMessage.events[0].message.text == "#個人資料")
                         {
+                            var result = client.Get("UserList/" + ReceivedMessage.events[0].source.userId);
+                            user user = result.ResultAs<user>();
                             isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
-                            string res = $"您的個人資料如下 \n 姓名:  '黃子豪' \n 年齡: '21' \n生日:  '2000-07-20' \n身高: 177.0 \n體重: 88.0 \n活動程度: '中度活動' ";
+                            string res = $"您的個人資料如下 \n 姓名: {user.Name} \n 年齡: {user.Age} \n生日: {user.Birthday} \n身高: {user.Height} \n體重: {user.Weight} \n活動程度: {user.Active} ";
                             //建立一個TextMessage物件
                             isRock.LineBot.TextMessage m = new isRock.LineBot.TextMessage(res);
                             m.quickReply.items.Add(new isRock.LineBot.QuickReplyMessageAction("重新設定個人資料", "#重新個人資料"));
                             bot.ReplyMessage(ReceivedMessage.events[0].replyToken, m);
+                        }
+                        else if (ReceivedMessage.events[0].message.text == "#適地性服務")
+                        {
+                            isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
+                            bot.ReplyMessage(ReceivedMessage.events[0].replyToken, "傳入你的「位置資訊」讓我們幫你找附近的超市");
+                        }
+                        else if (ReceivedMessage.events[0].message.text == "#情緒分析")
+                        {
+                            isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
+                            bot.ReplyMessage(ReceivedMessage.events[0].replyToken, "傳入你的「自拍照」讓我們幫你分析你的現在心情");
                         }
                         else if (ReceivedMessage.events[0].message.text == "#設定個人資料" || ReceivedMessage.events[0].message.text == "#重新個人資料" || confirm == false)
                         {
@@ -216,9 +251,10 @@ namespace LineBotFaceRecognition.Controllers
                                     responseMsg += result.ResponseMessageCandidate;
                                     responseMsg += $"以下是您的資料\n";
                                     responseMsg += Newtonsoft.Json.JsonConvert.SerializeObject(result.ConversationState.ConversationEntity);
-                                    string temp = "等資料庫建立";
+                                    var results = client.Get("UserList/" + ReceivedMessage.events[0].source.userId);
+                                    user user = results.ResultAs<user>();
                                     confirm = true;
-                                    string res = $"您的個人資料如下 \n姓名: {temp} \n年齡: {temp} \n生日: {temp} \n身高: {temp} \n體重: {temp} \n活動程度: {temp} ";
+                                    string res = $"您的個人資料如下 \n 姓名: {user.Name} \n 年齡: {user.Age} \n生日: {user.Birthday} \n身高: {user.Height} \n體重: {user.Weight} \n活動程度: {user.Active} ";
                                     isRock.LineBot.Utility.ReplyMessage(ReceivedMessage.events[0].replyToken, res, ChannelAccessToken);
                                     sendconfirmsg(ReceivedMessage.events[0].source.userId, ChannelAccessToken);
                                     break;
@@ -368,11 +404,11 @@ namespace LineBotFaceRecognition.Controllers
                 ""type"": ""image_carousel"",
     ""columns"": [
       {
-                    ""imageUrl"": ""https://i.imgur.com/8EwEXYY.png"",
+                    ""imageUrl"": ""https://i.imgur.com/pJmvVKp.png"",
         ""action"": {
                         ""type"": ""uri"",
-          ""label"": ""香蕉"",
-          ""uri"": ""https://i.imgur.com/8EwEXYY.png""
+          ""label"": ""西瓜"",
+          ""uri"": ""https://i.imgur.com/Y1oTAlW.png""
         }
                 },
       {
@@ -380,15 +416,15 @@ namespace LineBotFaceRecognition.Controllers
         ""action"": {
                         ""type"": ""uri"",
           ""label"": ""蘋果"",
-          ""uri"": ""https://i.imgur.com/6C96oJv.png""
+          ""uri"": ""https://i.imgur.com/twLKAua.png""
         }
                 },
       {
-                    ""imageUrl"": ""https://i.imgur.com/FidEH2v.png"",
+                    ""imageUrl"": ""https://i.imgur.com/8EwEXYY.png"",
         ""action"": {
                         ""type"": ""uri"",
-          ""label"": ""奇異果"",
-          ""uri"": ""https://i.imgur.com/FidEH2v.png""
+          ""label"": ""香蕉"",
+          ""uri"": ""https://i.imgur.com/zeNSimU.png""
         }
                 }
     ]
@@ -537,35 +573,139 @@ namespace LineBotFaceRecognition.Controllers
             bot.PushMessageWithJSON(userid, flex);
 
         }
-    }
+        public void userdatabaseupdate(string item, string ans)
+        {
+            IFirebaseConfig fcon = new FirebaseConfig()
+            {
+                AuthSecret = "bW4Tp1NHyMLMkWo1loJcqf9gVzKgzmYw6LHF1Eu3",
+                BasePath = "https://dailyjuicy-40e64-default-rtdb.firebaseio.com/"
+            };
+            IFirebaseClient client = new FireSharp.FirebaseClient(fcon);
 
-    public class LeaveRequestV2 : ConversationEntity
-    {
+            var results = client.Get("UserList/" + ReceivedMessage.events[0].source.userId);
+            user users = results.ResultAs<user>();
+            switch (item)
+            {
+                case "名子":
+                    user name = new user()
+                    {
+                        UserID = users.UserID,
+                        Name = ans,
+                        Age = "",
+                        Birthday = "",
+                        Height = "",
+                        Weight = "",
+                        Active = ""
+                    };
+                    var setter_name = client.Update("UserList/" + users.UserID, name);
+                    break;
+                case "年齡":
+                    user age = new user()
+                    {
+                        UserID = users.UserID,
+                        Name = users.Name,
+                        Age = ans,
+                        Birthday = "",
+                        Height = "",
+                        Weight = "",
+                        Active = ""
+                    };
+                    var setter_age = client.Update("UserList/" + users.UserID, age);
+                    break;
+                case "生日日期":
+                    user birth = new user()
+                    {
+                        UserID = users.UserID,
+                        Name = users.Name,
+                        Age = users.Age,
+                        Birthday = ans,
+                        Height = "",
+                        Weight = "",
+                        Active = ""
+                    };
+                    var setter_birth = client.Update("UserList/" + users.UserID, birth);
+                    break;
+                case "身高":
+                    user height = new user()
+                    {
+                        UserID = users.UserID,
+                        Name = users.Name,
+                        Age = users.Age,
+                        Birthday = users.Birthday,
+                        Height = ans,
+                        Weight = "",
+                        Active = ""
+                    };
+                    var setter_height = client.Update("UserList/" + users.UserID, height);
+                    break;
+                case "體重":
+                    user weight = new user()
+                    {
+                        UserID = users.UserID,
+                        Name = users.Name,
+                        Age = users.Age,
+                        Birthday = users.Birthday,
+                        Height = users.Height,
+                        Weight = ans,
+                        Active = ""
+                    };
+                    var setter_weight = client.Update("UserList/" + users.UserID, weight);
+                    break;
+                case "活動":
+                    user active = new user()
+                    {
+                        UserID = users.UserID,
+                        Name = users.Name,
+                        Age = users.Age,
+                        Birthday = users.Birthday,
+                        Height = users.Height,
+                        Weight = users.Weight,
+                        Active = ans
+                    };
+                    var setter_active = client.Update("UserList/" + users.UserID, active);
+                    break;
+            }
+        }
 
-        [Question("請問您的名子是?")]
-        [Order(1)]
-        public string 名子 { get; set; }
+        public class LeaveRequestV2 : ConversationEntity
+        {
 
-        [Question("請問您的年齡是?")]
-        [Order(2)]
-        public string 年齡 { get; set; }
+            [Question("請問您的名子是?")]
+            [Order(1)]
+            public string 名子 { get; set; }
+
+            [Question("請問您的年齡是?")]
+            [Order(2)]
+            public string 年齡 { get; set; }
 
 
-        [Question("請問您的生日日期是? 例:2000-07-20")]
-        [Order(3)]
-        public string 生日日期 { get; set; }
+            [Question("請問您的生日日期是? 例:2000-07-20")]
+            [Order(3)]
+            public string 生日日期 { get; set; }
 
-        [Question("請問您的身高(CM)是?")]
-        [Order(4)]
-        public float 身高 { get; set; }
+            [Question("請問您的身高(CM)是?")]
+            [Order(4)]
+            public float 身高 { get; set; }
 
-        [Question("請問您的體重(Kg)是?")]
-        [Order(5)]
-        public float 體重 { get; set; }
-        [ButtonsTemplateQuestion("詢問", "請問您的活動量是?", "https://arock.blob.core.windows.net/blogdata201706/22-124357-ad3c87d6-b9cc-488a-8150-1c2fe642d237.png", "低度活動", "中度活動", "高度活動")]
-        [Question("請問您你的活動量多少呢?")]
-        [Order(6)]
-        public string 活動 { get; set; }
+            [Question("請問您的體重(Kg)是?")]
+            [Order(5)]
+            public float 體重 { get; set; }
+            [ButtonsTemplateQuestion("詢問", "請問您的活動量是?", "https://arock.blob.core.windows.net/blogdata201706/22-124357-ad3c87d6-b9cc-488a-8150-1c2fe642d237.png", "低度活動", "中度活動", "高度活動")]
+            [Question("請問您你的活動量多少呢?")]
+            [Order(6)]
+            public string 活動 { get; set; }
+        }
+        public class user
+        {
+            public string UserID { get; set; }
+            public string Name { get; set; }
+            public string Age { get; set; }
+            public string Birthday { get; set; }
+            public string Height { get; set; }
+            public string Weight { get; set; }
+            public string Active { get; set; }
+
+        }
     }
 }
 
