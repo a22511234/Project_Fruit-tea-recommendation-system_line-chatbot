@@ -25,6 +25,7 @@ namespace LineBotFaceRecognition.Controllers
         [HttpPost]
         public IHttpActionResult POST()
         {
+            System.Net.ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             //取得Web.config中的 app settings
             var token = "S3o7moA62IOh6lIIdD5ECoK4zCKGa9D6C9vR0wzkmX2KaQDtj6Zcp7Q+ijNHS1WV2S5fx2a7a+oFKhIehTvm2dDqMD2qLYRQgbN4/6yq+inaRzj7eU0glrmQy0G2PErxMS5Erm9wQifEaQ/xD55QoQdB04t89/1O/w1cDnyilFU=";
             const string AdminUserId = "Ua3d3e1675bca2f5e468a6c80bf49f332";
@@ -126,7 +127,7 @@ namespace LineBotFaceRecognition.Controllers
                 {
                     isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
                     var userInfo = bot.GetUserInfo(ReceivedMessage.events[0].source.userId);
-                    var wellcome = $"{userInfo.displayName} 你好! 歡迎使用菓然有料\n本聊天機器人與各功能由陳亭妤、許沛涵、黃子豪、張柏榮共同開發\n要不我們先設定個人資料呢?";
+                    var wellcome = $"{userInfo.displayName} 你好! 歡迎使用菓然有料\n本聊天機器人與系統將幫助你邁向健康生活\n要不我們先設定個人資料呢?";
                     isRock.LineBot.TextMessage m = new isRock.LineBot.TextMessage(wellcome);
                     m.quickReply.items.Add(new isRock.LineBot.QuickReplyMessageAction($"好的", "#設定個人資料"));
                     m.quickReply.items.Add(new isRock.LineBot.QuickReplyMessageAction($"不要", "#不設定"));
@@ -154,7 +155,7 @@ namespace LineBotFaceRecognition.Controllers
                         this.ReplyMessage(ReceivedMessage.events[0].replyToken, waiting);
                         string Messagess = ProcessImageAsync(LineEvent, token);
                         string a = Messagess;
-                        string complete = $"照片分析完畢.\n依照分析結果您的心情為 {a}，因此我們推薦你以下三樣水果，點選其中一個進去，觀看相對應的食譜吧!";
+                        string complete = $"照片分析完畢.\n依照分析結果您的心情為 {a}，因此我們推薦你西瓜、蘋果、香蕉，點選下面圖片連結，觀看為您推薦的水果茶品吧!";
                         this.PushMessage(userID, complete);
                         flex(userID, ChannelAccessToken);
                     }
@@ -398,42 +399,85 @@ namespace LineBotFaceRecognition.Controllers
             var flex = @"
 [
 {
-  ""type"": ""template"",
-  ""altText"": ""this is an image carousel template"",
-  ""template"": {
-                ""type"": ""image_carousel"",
-    ""columns"": [
+""type"":""flex"",
+    ""altText"": ""this is flex message"",
+    ""contents"": 
+{
+  ""type"": ""bubble"",
+  ""body"": {
+                ""type"": ""box"",
+    ""layout"": ""vertical"",
+    ""contents"": [
       {
-                    ""imageUrl"": ""https://i.imgur.com/pJmvVKp.png"",
+                    ""type"": ""image"",
+        ""url"": ""https://i.imgur.com/kAVKapB.png"",
+        ""size"": ""full"",
+        ""aspectMode"": ""cover"",
+        ""aspectRatio"": ""1:1"",
+        ""gravity"": ""center"",
         ""action"": {
                         ""type"": ""uri"",
-          ""label"": ""西瓜"",
-          ""uri"": ""https://i.imgur.com/Y1oTAlW.png""
+          ""label"": ""action"",
+          ""uri"": ""http://linecorp.com/""
         }
                 },
       {
-                    ""imageUrl"": ""https://i.imgur.com/6C96oJv.png"",
-        ""action"": {
-                        ""type"": ""uri"",
-          ""label"": ""蘋果"",
-          ""uri"": ""https://i.imgur.com/twLKAua.png""
-        }
-                },
+                    ""type"": ""box"",
+        ""layout"": ""vertical"",
+        ""contents"": [],
+        ""position"": ""absolute"",
+        ""background"": {
+                        ""type"": ""linearGradient"",
+          ""angle"": ""0deg"",
+          ""endColor"": ""#00000000"",
+          ""startColor"": ""#00000099""
+        },
+        ""width"": ""100%"",
+        ""height"": ""40%"",
+        ""offsetBottom"": ""0px"",
+        ""offsetStart"": ""0px"",
+        ""offsetEnd"": ""0px""
+      },
       {
-                    ""imageUrl"": ""https://i.imgur.com/8EwEXYY.png"",
-        ""action"": {
-                        ""type"": ""uri"",
-          ""label"": ""香蕉"",
-          ""uri"": ""https://i.imgur.com/zeNSimU.png""
-        }
-                }
-    ]
+                    ""type"": ""box"",
+        ""layout"": ""horizontal"",
+        ""contents"": [
+          {
+                        ""type"": ""box"",
+            ""layout"": ""vertical"",
+            ""contents"": [
+              {
+                            ""type"": ""box"",
+                ""layout"": ""horizontal"",
+                ""contents"": [
+                  {
+                                ""type"": ""text"",
+                    ""text"": ""菓然有料"",
+                    ""size"": ""xl"",
+                    ""color"": ""#ffffff"",
+                    ""style"": ""normal"",
+                    ""position"": ""relative"",
+                    ""align"": ""start"",
+                    ""weight"": ""bold""
+                  }
+                ]
+              }
+            ],
+            ""spacing"": ""xs""
+          }
+        ],
+        ""position"": ""absolute"",
+        ""offsetBottom"": ""0px"",
+        ""offsetStart"": ""0px"",
+        ""offsetEnd"": ""0px"",
+        ""paddingAll"": ""20px""
+      }
+    ],
+    ""paddingAll"": ""0px""
   }
-        
+        }
 }
-    
-]
-";
+]";
             isRock.LineBot.Bot bot = new isRock.LineBot.Bot(token);
             bot.PushMessageWithJSON(userid, flex);
         }
@@ -469,7 +513,7 @@ namespace LineBotFaceRecognition.Controllers
             string[] PlaceID = new string[3];
             string[] addr = new string[3];
             string[] tel = { "無", "無", "無" };
-            string sURL = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius=1000&type=supermarket&keyword=%E9%A4%90%E5%BB%B3&key=AIzaSyBGAICU-ZH4QYDFSZW4jzgo9DWARe_pPrM";
+            string sURL = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius=1000&type=supermarket&keyword=%E9%A4%90%E5%BB%B3&key=AIzaSyBlHt4hrRVMmnCvuPV-fPNiiYxbCoHwL90";
             using (var client = new WebClient())
             using (var stream = client.OpenRead(sURL))
             using (var reader = new StreamReader(stream))
@@ -495,7 +539,7 @@ namespace LineBotFaceRecognition.Controllers
             int index = 0;
             while (index < 3)
             {
-                string sURL2 = $"https://maps.googleapis.com/maps/api/place/details/json?place_id={PlaceID[index]}&language=zh-TW&key=AIzaSyBGAICU-ZH4QYDFSZW4jzgo9DWARe_pPrM";
+                string sURL2 = $"https://maps.googleapis.com/maps/api/place/details/json?place_id={PlaceID[index]}&language=zh-TW&key=AIzaSyBlHt4hrRVMmnCvuPV-fPNiiYxbCoHwL90";
                 using (var client = new WebClient())
                 using (var stream = client.OpenRead(sURL2))
                 using (var reader = new StreamReader(stream))
@@ -690,7 +734,7 @@ namespace LineBotFaceRecognition.Controllers
             [Question("請問您的體重(Kg)是?")]
             [Order(5)]
             public float 體重 { get; set; }
-            [ButtonsTemplateQuestion("詢問", "請問您的活動量是?", "https://arock.blob.core.windows.net/blogdata201706/22-124357-ad3c87d6-b9cc-488a-8150-1c2fe642d237.png", "低度活動", "中度活動", "高度活動")]
+            [ButtonsTemplateQuestion("詢問", "請問您的活動量是?", "https://i.imgur.com/RU8e4rc.png", "低度活動", "中度活動", "高度活動")]
             [Question("請問您你的活動量多少呢?")]
             [Order(6)]
             public string 活動 { get; set; }
