@@ -323,6 +323,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+    <None Include="Properties\PublishProfiles\dailyjuicy - FTP.pubxml" />
+    <None Include="Properties\PublishProfiles\dailyjuicy - Web Deploy.pubxml" />
     <None Include="Properties\PublishProfiles\projectline - FTP.pubxml" />
     <None Include="Properties\PublishProfiles\projectline - FTP1.pubxml" />
     <None Include="Properties\PublishProfiles\projectline - Web Deploy.pubxml" />

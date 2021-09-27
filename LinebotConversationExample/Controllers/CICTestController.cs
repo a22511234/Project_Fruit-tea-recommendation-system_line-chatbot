@@ -208,12 +208,20 @@ namespace LineBotFaceRecognition.Controllers
                         else if (ReceivedMessage.events[0].message.text == "#適地性服務")
                         {
                             isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
-                            bot.ReplyMessage(ReceivedMessage.events[0].replyToken, "傳入你的「位置資訊」讓我們幫你找附近的超市");
+                            string Msg = $"傳入你的「位置資訊」讓我們幫你找附近的超市";
+                            isRock.LineBot.TextMessage m = new isRock.LineBot.TextMessage(Msg);
+                            m.quickReply.items.Add(new isRock.LineBot.QuickReplyLocationAction("位置資訊", new Uri("https://i.imgur.com/YA0JixQ.png")));
+                            bot.ReplyMessage(ReceivedMessage.events[0].replyToken, m);
                         }
                         else if (ReceivedMessage.events[0].message.text == "#情緒分析")
                         {
                             isRock.LineBot.Bot bot = new isRock.LineBot.Bot(ChannelAccessToken);
-                            bot.ReplyMessage(ReceivedMessage.events[0].replyToken, "傳入你的「自拍照」讓我們幫你分析你的現在心情");
+                            string Msg = $"傳入你的「自拍照」讓我們幫你分析你的現在心情";
+                            //建立一個TextMessage物件
+                            isRock.LineBot.TextMessage m =new isRock.LineBot.TextMessage(Msg);
+                            m.quickReply.items.Add(new isRock.LineBot.QuickReplyCameraAction("Show Camera", new Uri("https://image.pngaaa.com/830/1261830-middle.png")));
+                            m.quickReply.items.Add( new isRock.LineBot.QuickReplyCamerarollAction("Show Cameraroll", new Uri("https://www.pinclipart.com/picdir/big/164-1647836_album-collection-list-music-playlist-songs-icon-gallery.png")));
+                            bot.ReplyMessage(ReceivedMessage.events[0].replyToken, m);
                         }
                         else if (ReceivedMessage.events[0].message.text == "#設定個人資料" || ReceivedMessage.events[0].message.text == "#重新個人資料" || confirm == false)
                         {
@@ -513,7 +521,7 @@ namespace LineBotFaceRecognition.Controllers
             string[] PlaceID = new string[3];
             string[] addr = new string[3];
             string[] tel = { "無", "無", "無" };
-            string sURL = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius=1000&type=supermarket&keyword=%E9%A4%90%E5%BB%B3&key=AIzaSyBlHt4hrRVMmnCvuPV-fPNiiYxbCoHwL90";
+            string sURL = $"https://maps.googleapis.com/maps/api/place/nearbysearch/json?location={lat},{lng}&radius=1250&type=supermarket&keyword=%E9%A4%90%E5%BB%B3&key=AIzaSyBlHt4hrRVMmnCvuPV-fPNiiYxbCoHwL90";
             using (var client = new WebClient())
             using (var stream = client.OpenRead(sURL))
             using (var reader = new StreamReader(stream))
@@ -714,7 +722,7 @@ namespace LineBotFaceRecognition.Controllers
         public class LeaveRequestV2 : ConversationEntity
         {
 
-            [Question("請問您的名子是?")]
+            [Question("請問您的名字是?")]
             [Order(1)]
             public string 名子 { get; set; }
 
